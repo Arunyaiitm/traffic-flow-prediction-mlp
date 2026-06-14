@@ -1,89 +1,109 @@
-# Traffic Flow Prediction with MLP — Deliverable 3
-### Comparison with Existing Studies and an Iterative-Pruning Improvement
+# Traffic Flow Prediction with a Multilayer Perceptron
+### Foundations of Machine Learning — Course Project (Deliverables 1–3)
 
 **Authors:** Arunya (ZDA24B031) & Srijan Reddy Sankepally (ZDA24B007)
-**Course:** Foundations of Machine Learning
 
 ---
 
-## Overview
+## Project overview
 
-Deliverable 3 has two parts, building on our D1 (baseline models) and D2 (compression) work:
+This project predicts short-term traffic flow and studies how a simple Multilayer
+Perceptron (MLP) compares with classical machine-learning models and with published
+deep-learning studies — and how far the MLP can be compressed without losing accuracy.
+It spans three deliverables:
 
-1. **Comparison with existing studies** — we compare our traffic-prediction results
-   against three papers from our literature survey.
-2. **An implemented improvement** — we replace D2's one-shot pruning with *iterative*
-   (gradual) pruning, and evaluate it across three random seeds with error bars.
-
-## Repository contents
-
-| File | Description |
-|------|-------------|
-| `D3_Dataset_1.ipynb` | Huawei dataset — baseline MLP, one-shot pruning (D2) vs iterative pruning (D3), 3 seeds, error bars. |
-| `D3_Dataset_2.ipynb` | Metro Interstate dataset — baseline, one-shot vs iterative pruning, plus Prune+Coreset one-shot vs iterative, 3 seeds. |
-| `traffic-prediction-dataset.csv` | Huawei 6-cross traffic data (5-minute readings). |
-| `Metro_Interstate_Traffic_Volume.csv` | Metro Interstate hourly traffic data. |
-| `D3_Report.pdf` | Report — comparison with studies, the improvement, tables, figures, error bars. |
+- **D1 — Baselines & EDA:** datasets, exploratory analysis, literature survey, and a
+  first comparison of a classical model vs an MLP.
+- **D2 — Compression:** classical baselines (incl. Random Forest) plus pruning,
+  quantization, and coreset selection applied to the MLP, with multi-seed error bars.
+- **D3 — Comparison & improvement:** comparison against existing studies, and an
+  implemented improvement (iterative pruning) evaluated against one-shot pruning.
 
 ## Datasets
 
-1. **Huawei** (Navarro-Espinoza paper) — 16,128 readings, 6 sensors, every 5 min. Predict
-   the next 5 minutes from the past hour (4 lanes).
-2. **Metro Interstate** (Das & MSTIM papers) — 48,204 hourly records with weather/holiday
-   features (38,511 after cleaning). Predict the next hour from the past 24 hours.
+1. **Huawei intersection dataset** (Navarro-Espinoza paper) — 16,128 readings from six
+   sensors every 5 minutes over 56 days. Four sensors model the four lanes of one
+   intersection. Task: predict the next 5 minutes from the past hour.
+2. **Metro Interstate Traffic Volume** (Das & MSTIM papers) — 48,204 hourly records with
+   weather and holiday features (38,511 after cleaning). Task: predict the next hour from
+   the past 24 hours.
 
-## Method
+## Repository contents
 
-- **Models / architecture (unchanged from D1/D2):** Huawei MLP 48-128-64-4; Metro MLP
-  456-128-64-32-16-1. ReLU activations, Adam optimizer, 20 epochs, MinMax scaling,
-  chronological splits.
-- **Improvement — iterative pruning:** instead of pruning to 80% sparsity in one step
-  (D2, one-shot), prune gradually (20% → 40% → 60% → 80%) with a fine-tune after each
-  step so the surviving weights adapt.
-- **Evaluation:** every configuration is run over seeds {1, 7, 13}; results are reported
-  as mean ± standard deviation (error bars).
+| File | Deliverable | Description |
+|------|-------------|-------------|
+| `D1_DATASET1.ipynb`, `D1_DATASET2.ipynb` | D1 | EDA, preprocessing, Linear Regression vs MLP. |
+| `D2_DATASET1.ipynb`, `D2_DATASET2.ipynb` | D2 | Classical models + pruning/quantization/coreset on the MLP. |
+| `D3_Dataset_1.ipynb`, `D3_Dataset_2.ipynb` | D3 | One-shot vs iterative pruning, 3 seeds, error bars. |
+| `traffic-prediction-dataset.csv` | — | Huawei data. |
+| `Metro_Interstate_Traffic_Volume.csv` | — | Metro Interstate data. |
+| `D1_Report.pdf`, `D2_Report.pdf`, `D3_Report.pdf` | — | Reports for each stage. |
+| `Literature_Survey.pdf` | D1 | Survey of the three reference papers. |
 
-## How to run
+## Method (consistent across all deliverables)
 
-The notebooks are designed for Google Colab.
+- **MLP architecture (unchanged throughout):** Huawei 48-128-64-4; Metro
+  456-128-64-32-16-1. ReLU activations, linear output.
+- **Pipeline:** moving-average repair of sensor-failure zeros (Huawei); impossible-value
+  and IQR-outlier removal + one-hot encoding (Metro); MinMax scaling fit on training data
+  only; chronological train/test split (no leakage); sliding-window inputs.
+- **Training:** Adam (and plain SGD for Huawei experiments), 20 epochs; seeds {1, 7, 13}
+  for error bars.
+- **Compression (D2):** L1 pruning (swept 5–80%), dynamic int8 quantization, and coreset
+  (training-subset) selection — individually, in pairs, and all three.
+- **Improvement (D3):** iterative pruning (gradual 20→40→60→80% with fine-tuning between
+  steps) compared against one-shot pruning.
+- **Metrics:** MAE, MAPE, RMSE, R².
 
-1. Open a notebook in Colab.
-2. Run the first cell to import dependencies (`numpy`, `pandas`, `matplotlib`,
-   `scikit-learn`, `torch`).
-3. When prompted, upload the corresponding CSV
-   (`traffic-prediction-dataset.csv` for Dataset 1,
-   `Metro_Interstate_Traffic_Volume.csv` for Dataset 2).
-4. Run the remaining cells top to bottom. Training prints every epoch.
+## Key results
 
-Note: the Metro notebook trains many models over three seeds and can take a while; keep
-the Colab tab active.
+**D1 — classical vs MLP**
 
-## Results (summary)
+| Dataset | Model | R² |
+|---|---|---|
+| Huawei | Linear Regression | 0.946 |
+| Huawei | MLP | 0.942–0.945 |
+| Metro | MLP | 0.90 |
 
-**Comparison with existing studies**
+**D2 — compression (best findings)**
+
+- Huawei: pruning to 80% kept R² at 0.947; int8 quantization gave a ~3× smaller model
+  with no accuracy loss.
+- Metro: compression *improved* accuracy (baseline 0.883 → prune+coreset 0.906) — the
+  over-parameterized network benefits from pruning as regularization.
+- Random Forest (3 seeds): R² 0.919 ± 0.001 — below the MLP and Linear Regression.
+
+**D3 — comparison & improvement**
 
 | Dataset | Our best model | Our R² | Study | Their result |
 |---|---|---|---|---|
 | Huawei | MLP + pruning | 0.947 | Navarro-Espinoza | R² ≈ 0.93 |
-| Metro | MLP + prune + coreset | 0.90 | Das / MSTIM | LSTM/GRU, CNN+attention (deep) |
+| Metro | MLP + prune + coreset | 0.90 | Das / MSTIM | deep models (LSTM/GRU, CNN+attn) |
 
-**Improvement — one-shot vs iterative pruning (R², mean ± std over 3 seeds)**
+Iterative pruning (D3) did **not** beat one-shot pruning on these small-to-medium
+networks (Huawei 0.945 vs 0.947; Metro 0.88 vs 0.90), so one-shot is retained. The
+analysis explains that iterative pruning helps mainly large, over-parameterized models.
 
-| Method | Huawei | Metro |
-|---|---|---|
-| Baseline MLP | 0.9437 ± 0.0023 | 0.8826 ± 0.0192 |
-| One-shot prune 80% (D2) | **0.9472 ± 0.0008** | 0.8928 ± 0.0069 |
-| Iterative prune 80% (D3) | 0.9454 ± 0.0007 | 0.8761 ± 0.0065 |
-| Prune + Coreset one-shot (D2) | — | **0.8998 ± 0.0038** |
-| Prune + Coreset iterative (D3) | — | 0.8818 ± 0.0017 |
+## How to run
 
-**Finding:** iterative pruning did not outperform one-shot pruning on these
-small-to-medium networks; one-shot is retained. Iterative pruning's advantage applies
-mainly to large, over-parameterized models. Our best overall model remains the
-prune+coreset MLP (≈0.90 on Metro, 0.947 on Huawei) at roughly one-third the storage.
+The notebooks are built for Google Colab.
+
+1. Open a notebook in Colab and run the first cell to import dependencies (`numpy`,
+   `pandas`, `matplotlib`, `seaborn`, `scikit-learn`, `torch`).
+2. Upload the matching CSV when prompted.
+3. Run all cells top to bottom. Training prints every epoch.
+
+A fixed set of random seeds is used for reproducibility.
 
 ## Reference papers
 
-1. Navarro-Espinoza et al. (2022), *Technologies* — Huawei intersection dataset.
+1. Navarro-Espinoza et al. (2022), *Technologies*, vol. 10(1):5 — Huawei dataset.
 2. Das (2023), arXiv:2303.12643 — Metro Interstate dataset (LSTM/GRU).
 3. MSTIM (2025), arXiv:2504.13576 — Metro Interstate dataset (CNN + LSTM + attention).
+
+## Summary
+
+A simple MLP predicts traffic flow about as accurately as classical models and as
+published deep-learning studies, while being far cheaper to train and — through pruning,
+quantization, and coreset selection — far smaller to store, with no meaningful loss of
+accuracy.
